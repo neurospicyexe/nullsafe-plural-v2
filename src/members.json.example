@@ -1,0 +1,10 @@
+{
+  "MEMBER_ID_HERE": {
+    "name": "Example Member",
+    "pk": "pkid00"
+  },
+  "ANOTHER_MEMBER_ID": {
+    "name": "Another Member",
+    "pk": "pkid01"
+  }
+}
