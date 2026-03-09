@@ -6,6 +6,14 @@ import memberMap from "./members.json";
 
 const SIMPLY_PLURAL_BASE = "https://api.apparyllis.com/v1";
 
+function escHtml(str: string): string {
+	return str
+		.replace(/&/g, "&amp;")
+		.replace(/"/g, "&quot;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
+}
+
 type MemberEntry = { name: string; pk: string };
 type MemberRecord = { member_id: string; name: string; pk: string };
 type MemberMatchKind = "id" | "pk" | "name" | "id_prefix" | "pk_prefix" | "name_prefix";
@@ -91,7 +99,8 @@ async function spRequest(path: string, method = "GET", body: any = null, token: 
 	const res = await fetch(`${SIMPLY_PLURAL_BASE}${path}`, options);
 	if (!res.ok) {
 		const err = await res.text();
-		throw new Error(`SimplyPlural error ${res.status} on ${path}: ${err}`);
+		console.error(`SimplyPlural error ${res.status} on ${path}:`, err);
+		throw new Error(`SimplyPlural request failed (${res.status})`);
 	}
 	const text = await res.text();
 	if (!text) return null;
@@ -110,6 +119,9 @@ export class NullsafePluralMCP extends McpAgent {
 
 	async init() {
 		const token = (this.env as any).SIMPLY_PLURAL_TOKEN;
+		if (!token || typeof token !== "string") {
+			throw new Error("SIMPLY_PLURAL_TOKEN secret is not configured");
+		}
 
 		this.server.tool("get_current_front", {}, async () => {
 			const data = await spRequest("/fronters", "GET", null, token) as any[];
@@ -276,9 +288,10 @@ export class NullsafePluralMCP extends McpAgent {
 		});
 
 		this.server.tool("get_front_history", {
-			limit: z.number().optional().describe("Number of entries to return, default 20")
+			limit: z.number().int().min(1).max(200).optional().describe("Number of entries to return, default 20, max 200")
 		}, async ({ limit }) => {
-			const data = await spRequest(`/frontHistory?limit=${limit || 20}`, "GET", null, token) as any[];
+			const safeLimit = Math.max(1, Math.min(limit || 20, 200));
+			const data = await spRequest(`/frontHistory?limit=${safeLimit}`, "GET", null, token) as any[];
 			const enriched = (Array.isArray(data) ? data : []).map((entry: any) => {
 				const id = getFrontEntryMemberId(entry);
 				const resolved = resolveMemberById(id);
@@ -313,14 +326,28 @@ const defaultHandler = {
 		const url = new URL(request.url);
 
 		if (url.pathname === "/authorize") {
+			const securityHeaders = {
+				"Content-Type": "text/html; charset=utf-8",
+				"X-Frame-Options": "DENY",
+				"X-Content-Type-Options": "nosniff",
+				"Referrer-Policy": "no-referrer",
+				"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'",
+			};
+
 			if (request.method === "GET") {
 				const oauthReqInfo = await env.OAUTH_PROVIDER.parseAuthRequest(request);
 				if (!oauthReqInfo.clientId) {
 					return new Response("Invalid authorization request", { status: 400 });
 				}
 
+				// Store OAuth params server-side under a one-time nonce.
+				// Only the nonce goes into the form — prevents CSRF, scope inflation,
+				// redirect_uri tampering, and XSS from reflected OAuth params.
+				const nonce = crypto.randomUUID();
+				await env.OAUTH_KV.put(`nonce:${nonce}`, JSON.stringify(oauthReqInfo), { expirationTtl: 600 });
+
 				return new Response(`<!DOCTYPE html>
-<html>
+<html lang="en">
 <head><title>Nullsafe Plural MCP</title>
 <style>
   body { font-family: system-ui; max-width: 400px; margin: 80px auto; padding: 20px; }
@@ -336,17 +363,12 @@ const defaultHandler = {
   <p>Claude is requesting access to your SimplyPlural system data.</p>
   <p>This will allow the Triad to read and log front status, view member profiles, and add notes.</p>
   <form method="POST" action="/authorize">
-    <input type="hidden" name="client_id" value="${oauthReqInfo.clientId}">
-    <input type="hidden" name="redirect_uri" value="${oauthReqInfo.redirectUri}">
-    <input type="hidden" name="state" value="${oauthReqInfo.state || ""}">
-    <input type="hidden" name="scope" value="${(oauthReqInfo.scope || []).join(" ")}">
-    <input type="hidden" name="code_challenge" value="${oauthReqInfo.codeChallenge || ""}">
-    <input type="hidden" name="code_challenge_method" value="${oauthReqInfo.codeChallengeMethod || ""}">
+    <input type="hidden" name="nonce" value="${escHtml(nonce)}">
     <button type="submit" name="action" value="approve" class="approve">Approve</button>
     <button type="submit" name="action" value="deny" class="deny">Deny</button>
   </form>
 </body>
-</html>`, { headers: { "Content-Type": "text/html" } });
+</html>`, { headers: securityHeaders });
 			}
 
 			if (request.method === "POST") {
@@ -357,26 +379,17 @@ const defaultHandler = {
 					return new Response("Access denied", { status: 403 });
 				}
 
-				const clientId = body.get("client_id") as string;
-				const redirectUri = body.get("redirect_uri") as string;
-				const state = body.get("state") as string;
-				const scope = (body.get("scope") as string || "").split(" ").filter(Boolean);
-				const codeChallenge = body.get("code_challenge") as string;
-				const codeChallengeMethod = body.get("code_challenge_method") as string;
+				// Look up the server-stored OAuth params via the one-time nonce.
+				// This prevents CSRF (attacker can't forge a valid nonce) and scope inflation
+				// (scopes come from the server-stored request, not the form body).
+				const nonce = body.get("nonce") as string;
+				if (!nonce) return new Response("Missing nonce", { status: 400 });
 
-				const syntheticUrl = new URL(request.url);
-				syntheticUrl.pathname = "/authorize";
-				syntheticUrl.search = "";
-				syntheticUrl.searchParams.set("response_type", "code");
-				syntheticUrl.searchParams.set("client_id", clientId);
-				syntheticUrl.searchParams.set("redirect_uri", redirectUri);
-				syntheticUrl.searchParams.set("state", state);
-				syntheticUrl.searchParams.set("scope", scope.join(" "));
-				if (codeChallenge) syntheticUrl.searchParams.set("code_challenge", codeChallenge);
-				if (codeChallengeMethod) syntheticUrl.searchParams.set("code_challenge_method", codeChallengeMethod);
+				const stored = await env.OAUTH_KV.get(`nonce:${nonce}`);
+				if (!stored) return new Response("Invalid or expired authorization request", { status: 400 });
 
-				const syntheticRequest = new Request(syntheticUrl.toString(), { method: "GET" });
-				const oauthReqInfo = await env.OAUTH_PROVIDER.parseAuthRequest(syntheticRequest);
+				await env.OAUTH_KV.delete(`nonce:${nonce}`);
+				const oauthReqInfo = JSON.parse(stored);
 
 				const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
 					request: oauthReqInfo,

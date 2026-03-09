@@ -170,6 +170,7 @@ dist
 
 .dev.vars
 .wrangler/
+wrangler.prod.jsonc
 
 .dev.vars*
 !.dev.vars.example
