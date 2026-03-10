@@ -17,12 +17,12 @@ npm run cf-typegen   # Generate Cloudflare Workers types
 
 Nullsafe-plural-v2 is one of four projects that form a suite. When making changes that cross boundaries, consult the adjacent project's CLAUDE.md and MCP tools.
 
-| Project | Location | Role |
-|---------|----------|------|
-| **halseth** | `C:/dev/halseth` | Primary data backend — Cloudflare Worker + D1 + R2. Exposes HTTP endpoints and MCP tools (`mcp__claude_ai_Halseth__*`) |
-| **hearth** | `C:/dev/hearth` | Next.js dashboard frontend. Reads halseth HTTP endpoints via `lib/halseth.ts`. Deployed on Vercel |
-| **nullsafe-plural-v2** | `C:/dev/nullsafe-plural-v2` | Cloudflare Workers MCP for SimplyPlural (plural/fronting system). Exposes `mcp__claude_ai_Nullsafe-Plural-v2__*` tools |
-| **nullsafe-second-brain** | `C:/dev/nullsafe-second-brain` | Local Node.js MCP (stdio). Reads halseth + nullsafe-plural-v2 via HTTP, writes to Obsidian vault, maintains SQLite vector store for companion RAG |
+| Project | Role |
+|---------|------|
+| **halseth** | Primary data backend — Cloudflare Worker + D1 + R2. Exposes HTTP endpoints and MCP tools (`mcp__claude_ai_Halseth__*`) |
+| **hearth** | Next.js dashboard frontend. Reads halseth HTTP endpoints via `lib/halseth.ts`. Deployed on Vercel |
+| **nullsafe-plural-v2** | Cloudflare Workers MCP for SimplyPlural (plural/fronting system). Exposes `mcp__claude_ai_Nullsafe-Plural-v2__*` tools |
+| **nullsafe-second-brain** | Local Node.js MCP (stdio). Reads halseth + nullsafe-plural-v2 via HTTP, writes to Obsidian vault, maintains SQLite vector store for companion RAG |
 
 Nullsafe-plural-v2 and halseth are independent backends that both surface data upward to hearth and second-brain. Second-brain is the synthesis/RAG layer that reads both.
 
@@ -58,12 +58,12 @@ All API calls go through `spRequest()` to `https://api.apparyllis.com/v1`. The a
 ### MCP endpoint
 
 The server is accessible at `/mcp` (SSE transport). Connect via:
-- Claude Desktop: use `mcp-remote` proxy pointing to `https://nullsafe-plural-v2.<account>.workers.dev/mcp`
+- Claude Desktop: use `mcp-remote` proxy pointing to `https://<your-worker>.workers.dev/mcp`
 - Cloudflare AI Playground: enter the `/mcp` URL directly
 
 ## Security
 
-Full OWASP + vibesec audit run 2026-03-09. Fixes applied 2026-03-09. All findings are pending.
+Full OWASP + vibesec audit run 2026-03-09. Fixes applied 2026-03-09.
 
 | Severity | Location | Issue |
 |----------|----------|-------|
