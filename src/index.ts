@@ -471,8 +471,8 @@ const defaultHandler = {
 		// Internal: get a single member by name/id/pk
 		if (url.pathname === "/internal/member" && request.method === "POST") {
 			try {
-				const body = await request.json() as { name_or_id: string };
-				const { record } = resolveMemberInput(body.name_or_id);
+				const body = await request.json() as { member_input: string };
+				const { record } = resolveMemberInput(body.member_input);
 				const token = (env as any).SIMPLY_PLURAL_TOKEN;
 				let description: string | undefined;
 				try {
@@ -485,7 +485,9 @@ const defaultHandler = {
 						const raw = data?.content?.description;
 						if (raw && raw.trim().length > 0) description = raw.trim();
 					}
-				} catch { /* non-fatal */ }
+				} catch (err) {
+					console.warn("Failed to fetch description for member", record.member_id, err);
+				}
 				return new Response(JSON.stringify({ member_id: record.member_id, name: record.name, pk: record.pk, ...(description ? { description } : {}) }), { headers: { "Content-Type": "application/json" } });
 			} catch (e) {
 				return new Response(JSON.stringify({ error: String(e) }), { status: 400, headers: { "Content-Type": "application/json" } });
