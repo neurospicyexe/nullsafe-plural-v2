@@ -468,6 +468,97 @@ const defaultHandler = {
 			}
 		}
 
+		// Internal: get a single member by name/id/pk
+		if (url.pathname === "/internal/member" && request.method === "POST") {
+			try {
+				const body = await request.json() as { name_or_id: string };
+				const { record } = resolveMemberInput(body.name_or_id);
+				const token = (env as any).SIMPLY_PLURAL_TOKEN;
+				let description: string | undefined;
+				try {
+					const memberRes = await fetch(
+						`${SIMPLY_PLURAL_BASE}/member/${record.member_id}`,
+						{ headers: { Authorization: token } }
+					);
+					if (memberRes.ok) {
+						const data = await memberRes.json() as { content?: { description?: string } };
+						const raw = data?.content?.description;
+						if (raw && raw.trim().length > 0) description = raw.trim();
+					}
+				} catch { /* non-fatal */ }
+				return new Response(JSON.stringify({ member_id: record.member_id, name: record.name, pk: record.pk, ...(description ? { description } : {}) }), { headers: { "Content-Type": "application/json" } });
+			} catch (e) {
+				return new Response(JSON.stringify({ error: String(e) }), { status: 400, headers: { "Content-Type": "application/json" } });
+			}
+		}
+
+		// Internal: update a member's description
+		if (url.pathname === "/internal/update-description" && request.method === "POST") {
+			try {
+				const body = await request.json() as { member_input: string; description: string };
+				const { record } = resolveMemberInput(body.member_input);
+				const token = (env as any).SIMPLY_PLURAL_TOKEN;
+				const res = await fetch(
+					`${SIMPLY_PLURAL_BASE}/member/${record.member_id}`,
+					{
+						method: "PATCH",
+						headers: { Authorization: token, "Content-Type": "application/json" },
+						body: JSON.stringify({ description: body.description }),
+					}
+				);
+				if (!res.ok) {
+					const err = await res.text();
+					return new Response(JSON.stringify({ success: false, error: err }), { status: res.status, headers: { "Content-Type": "application/json" } });
+				}
+				return new Response(JSON.stringify({ success: true, member_id: record.member_id, name: record.name }), { headers: { "Content-Type": "application/json" } });
+			} catch (e) {
+				return new Response(JSON.stringify({ success: false, error: String(e) }), { status: 400, headers: { "Content-Type": "application/json" } });
+			}
+		}
+
+		// Internal: search members by name substring
+		if (url.pathname === "/internal/search-members" && request.method === "POST") {
+			try {
+				const body = await request.json() as { query: string; limit?: number };
+				const lower = body.query.toLowerCase();
+				const limit = body.limit ?? 10;
+				const results = MEMBER_ENTRIES
+					.filter(([, entry]) => entry.name.toLowerCase().includes(lower))
+					.slice(0, limit)
+					.map(([member_id, entry]) => ({ member_id, name: entry.name }));
+				return new Response(JSON.stringify(results), { headers: { "Content-Type": "application/json" } });
+			} catch (e) {
+				return new Response(JSON.stringify([]), { status: 400, headers: { "Content-Type": "application/json" } });
+			}
+		}
+
+		// Internal: get front history
+		if (url.pathname === "/internal/front-history" && request.method === "POST") {
+			try {
+				const body = await request.json() as { limit?: number };
+				const limit = body.limit ?? 10;
+				const token = (env as any).SIMPLY_PLURAL_TOKEN;
+				const res = await fetch(
+					`${SIMPLY_PLURAL_BASE}/frontHistory?limit=${limit}`,
+					{ headers: { Authorization: token } }
+				);
+				if (!res.ok) return new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" } });
+				const data = await res.json() as Array<{ content?: { startTime?: number; member?: string }; startTime?: number; member?: string }>;
+				const history = data.slice(0, limit).map(entry => {
+					const memberId = getFrontEntryMemberId(entry);
+					const memberEntry = MEMBERS[memberId];
+					return {
+						member_id: memberId,
+						name: memberEntry?.name ?? memberId,
+						startTime: entry.content?.startTime ?? entry.startTime,
+					};
+				});
+				return new Response(JSON.stringify(history), { headers: { "Content-Type": "application/json" } });
+			} catch (e) {
+				return new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" } });
+			}
+		}
+
 		return new Response("Not found", { status: 404 });
 	}
 };
