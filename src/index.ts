@@ -488,7 +488,7 @@ const defaultHandler = {
 				} catch (err) {
 					console.warn("Failed to fetch description for member", record.member_id, err);
 				}
-				return new Response(JSON.stringify({ member_id: record.member_id, name: record.name, pk: record.pk, ...(description ? { description } : {}) }), { headers: { "Content-Type": "application/json" } });
+				return new Response(JSON.stringify({ member_id: record.member_id, name: record.name, ...(description ? { description } : {}) }), { headers: { "Content-Type": "application/json" } });
 			} catch (e) {
 				return new Response(JSON.stringify({ error: String(e) }), { status: 400, headers: { "Content-Type": "application/json" } });
 			}
