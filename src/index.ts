@@ -292,7 +292,7 @@ export class NullsafePluralMCP extends McpAgent {
 				};
 			} catch (e) {
 				return {
-					content: [{ type: "text", text: JSON.stringify({ success: false, error: String(e) }) }],
+					content: [{ type: "text", text: JSON.stringify({ success: false, error: String(e) }, null, 2) }],
 				};
 			}
 		});
