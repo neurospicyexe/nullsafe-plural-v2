@@ -410,10 +410,11 @@ const defaultHandler = {
 			if (!token) return new Response(JSON.stringify(null), { headers: { "Content-Type": "application/json" } });
 			try {
 				const data = await spRequest("/fronters", "GET", null, token) as any[];
-				const fronters = (Array.isArray(data) ? data : []).map((entry: any) => {
+				const fronters = (Array.isArray(data) ? data : []).flatMap((entry: any) => {
 					const id = getFrontEntryMemberId(entry);
 					const resolved = resolveMemberById(id);
-					return { name: resolved?.name || id, member_id: id };
+					if (!resolved) return [];
+					return [{ name: resolved.name, member_id: id }];
 				});
 				if (fronters.length === 0) return new Response(JSON.stringify(null), { headers: { "Content-Type": "application/json" } });
 				const result = {
