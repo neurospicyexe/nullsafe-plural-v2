@@ -415,8 +415,12 @@ const defaultHandler = {
 					const resolved = resolveMemberById(id);
 					return { name: resolved?.name || id, member_id: id };
 				});
-				const first = fronters[0] ?? null;
-				return new Response(JSON.stringify(first), { headers: { "Content-Type": "application/json" } });
+				if (fronters.length === 0) return new Response(JSON.stringify(null), { headers: { "Content-Type": "application/json" } });
+				const result = {
+					name: fronters.map(f => f.name).join(" + "),
+					member_id: fronters[0].member_id,
+				};
+				return new Response(JSON.stringify(result), { headers: { "Content-Type": "application/json" } });
 			} catch {
 				return new Response(JSON.stringify(null), { headers: { "Content-Type": "application/json" } });
 			}
