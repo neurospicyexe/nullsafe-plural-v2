@@ -275,6 +275,28 @@ export class NullsafePluralMCP extends McpAgent {
 			}
 		});
 
+		this.server.tool("update_member_description", {
+			member_id: z.string().describe(
+				"Member to update. Accepts SimplyPlural member_id, pk, exact name, or unique prefix."
+			),
+			description: z.string().describe("New description text to set on this member."),
+		}, async ({ member_id, description }) => {
+			try {
+				const { record } = resolveMemberInput(member_id);
+				await spRequest(`/member/${record.member_id}`, "PATCH", { description }, token);
+				return {
+					content: [{
+						type: "text",
+						text: JSON.stringify({ success: true, member_id: record.member_id, name: record.name }, null, 2),
+					}],
+				};
+			} catch (e) {
+				return {
+					content: [{ type: "text", text: JSON.stringify({ success: false, error: String(e) }) }],
+				};
+			}
+		});
+
 		this.server.tool("add_member_note", {
 			member_id: z.string().describe("SimplyPlural member ID (preferred). pk/name/partial also accepted and normalized locally."),
 			note: z.string().describe("Body text for the note"),
