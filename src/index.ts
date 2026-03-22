@@ -14,7 +14,7 @@ function escHtml(str: string): string {
 		.replace(/>/g, "&gt;");
 }
 
-type MemberEntry = { name: string; pk: string };
+type MemberEntry = { name: string; pk: string; description?: string };
 type MemberRecord = { member_id: string; name: string; pk: string };
 type MemberMatchKind = "id" | "pk" | "name" | "id_prefix" | "pk_prefix" | "name_prefix";
 
@@ -241,13 +241,32 @@ export class NullsafePluralMCP extends McpAgent {
 		}, async ({ member_id }) => {
 			try {
 				const { record, matched_by } = resolveMemberInput(member_id);
+
+				// Fetch description from SP API -- non-fatal if unavailable
+				let description: string | undefined;
+				try {
+					const memberRes = await fetch(
+						`${SIMPLY_PLURAL_BASE}/member/${record.member_id}`,
+						{ headers: { Authorization: token } }
+					);
+					if (memberRes.ok) {
+						const memberData = await memberRes.json() as { content?: { description?: string } };
+						const raw = memberData?.content?.description;
+						if (raw && raw.trim().length > 0) description = raw.trim();
+					}
+				} catch {
+					// Description fetch is non-fatal -- return member without it
+				}
+
 				return {
 					content: [{
 						type: "text",
 						text: JSON.stringify({
 							member_id: record.member_id,
 							name: record.name,
-							matched_by
+							pk: record.pk,
+							matched_by,
+							...(description ? { description } : {}),
 						}, null, 2)
 					}]
 				};
