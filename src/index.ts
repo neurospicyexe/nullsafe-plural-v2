@@ -403,6 +403,25 @@ const defaultHandler = {
 			}
 		}
 
+		// Internal service binding route -- no OAuth required.
+		// Only reachable via Cloudflare Service Binding (not internet-accessible).
+		if (url.pathname === "/internal/front" && request.method === "POST") {
+			const token = (env as any).SIMPLY_PLURAL_TOKEN;
+			if (!token) return new Response(JSON.stringify(null), { headers: { "Content-Type": "application/json" } });
+			try {
+				const data = await spRequest("/fronters", "GET", null, token) as any[];
+				const fronters = (Array.isArray(data) ? data : []).map((entry: any) => {
+					const id = getFrontEntryMemberId(entry);
+					const resolved = resolveMemberById(id);
+					return { name: resolved?.name || id, member_id: id };
+				});
+				const first = fronters[0] ?? null;
+				return new Response(JSON.stringify(first), { headers: { "Content-Type": "application/json" } });
+			} catch {
+				return new Response(JSON.stringify(null), { headers: { "Content-Type": "application/json" } });
+			}
+		}
+
 		return new Response("Not found", { status: 404 });
 	}
 };
