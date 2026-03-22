@@ -254,8 +254,8 @@ export class NullsafePluralMCP extends McpAgent {
 						const raw = memberData?.content?.description;
 						if (raw && raw.trim().length > 0) description = raw.trim();
 					}
-				} catch {
-					// Description fetch is non-fatal -- return member without it
+				} catch (e) {
+					console.warn(`get_member: description fetch failed for ${record.member_id}:`, e);
 				}
 
 				return {
