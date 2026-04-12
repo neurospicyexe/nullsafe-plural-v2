@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Commands
 
 ```bash
@@ -12,6 +10,20 @@ npm run lint:fix     # Lint and auto-fix with oxlint
 npm run format       # Format code with oxfmt
 npm run cf-typegen   # Generate Cloudflare Workers types
 ```
+
+Part of the BBH suite -- see root `CLAUDE.md` for cross-project context.
+
+## Multi-Agent System Conventions
+
+When making changes to one identity/config file (e.g., Cypher), always check and apply the same changes to ALL sibling identity files (e.g., Drevan, Gaia, and any others in the same directory).
+
+## Project Scope
+
+When reviewing or fixing bugs across the multi-agent system, always scan ALL projects: Phoenix, Hearth, relay, discord_bot, and any archived directories. Never assume a directory doesn't exist without checking.
+
+## Testing
+
+After implementing any TypeScript changes, run the integration/unit tests before committing. If tests fail, fix all errors (including missing metadata fields, wrong types, empty block formatting) before marking the task complete.
 
 ## Ecosystem — Four Interworking Projects
 
@@ -63,7 +75,7 @@ The server is accessible at `/mcp` (SSE transport). Connect via:
 
 ## Security
 
-Full OWASP + vibesec audit run 2026-03-09. Fixes applied 2026-03-09.
+Full OWASP + vibesec audit run 2026-03-09. Fixes applied 2026-03-09. Open findings: `docs/security-audit.md`
 
 | Severity | Location | Issue |
 |----------|----------|-------|

@@ -561,6 +561,75 @@ const defaultHandler = {
 			}
 		}
 
+		// Internal: log a front change (create/update/close front history entry)
+		if (url.pathname === "/internal/log-front-change" && request.method === "POST") {
+			try {
+				const body = await request.json() as { member_id: string; status: "fronting" | "co-con" | "unknown"; custom_status?: string };
+				const { record } = resolveMemberInput(body.member_id);
+				const token = (env as any).SIMPLY_PLURAL_TOKEN;
+				if (!token) return new Response(JSON.stringify({ success: false, error: "SIMPLY_PLURAL_TOKEN not set" }), { status: 500, headers: { "Content-Type": "application/json" } });
+
+				const current = await spRequest("/fronters", "GET", null, token) as any[];
+				const activeEntries = (Array.isArray(current) ? current : []).filter((entry: any) =>
+					getFrontEntryMemberId(entry) === record.member_id
+				);
+				const now = Date.now();
+
+				// status=unknown: close any active front entry for this member
+				if (body.status === "unknown") {
+					if (activeEntries.length === 0) {
+						return new Response(JSON.stringify({ success: true, result: "no_active_front_entry", member_id: record.member_id, name: record.name }), { headers: { "Content-Type": "application/json" } });
+					}
+					for (const entry of activeEntries) {
+						const id = getFrontEntryDocId(entry);
+						if (!id) continue;
+						const patch: Record<string, unknown> = { live: false, endTime: now };
+						if (body.custom_status) patch.customStatus = body.custom_status;
+						await spRequest(`/frontHistory/${id}`, "PATCH", patch, token);
+					}
+					return new Response(JSON.stringify({ success: true, result: "closed_active_front", member_id: record.member_id, name: record.name }), { headers: { "Content-Type": "application/json" } });
+				}
+
+				// status=fronting/co-con: update existing or create new
+				const desiredStatus = body.custom_status || body.status;
+				if (activeEntries.length > 0) {
+					const id = getFrontEntryDocId(activeEntries[0]);
+					if (id) {
+						await spRequest(`/frontHistory/${id}`, "PATCH", { customStatus: desiredStatus }, token);
+						return new Response(JSON.stringify({ success: true, result: "updated_active_front", front_id: id, member_id: record.member_id, name: record.name }), { headers: { "Content-Type": "application/json" } });
+					}
+				}
+				const data = await spRequest("/frontHistory", "POST", { member: record.member_id, custom: false, live: true, startTime: now, customStatus: desiredStatus }, token) as any;
+				const front_id = data?._id || data?.id || null;
+				return new Response(JSON.stringify({ success: true, result: "created_front_entry", front_id, member_id: record.member_id, name: record.name }), { headers: { "Content-Type": "application/json" } });
+			} catch (e) {
+				return new Response(JSON.stringify({ success: false, error: String(e) }), { status: 400, headers: { "Content-Type": "application/json" } });
+			}
+		}
+
+		// Internal: add a note to a system member
+		if (url.pathname === "/internal/add-member-note" && request.method === "POST") {
+			try {
+				const body = await request.json() as { member_id: string; note: string; title?: string; color?: string };
+				const { record } = resolveMemberInput(body.member_id);
+				const token = (env as any).SIMPLY_PLURAL_TOKEN;
+				if (!token) return new Response(JSON.stringify({ success: false, error: "SIMPLY_PLURAL_TOKEN not set" }), { status: 500, headers: { "Content-Type": "application/json" } });
+
+				const data = await spRequest("/note", "POST", {
+					member: record.member_id,
+					date: Date.now(),
+					title: body.title || "MCP Note",
+					color: body.color || "#808080",
+					supportMarkdown: true,
+					note: body.note,
+				}, token) as any;
+				const note_id = data?._id || data?.id || null;
+				return new Response(JSON.stringify({ success: true, id: note_id, member_id: record.member_id, name: record.name }), { headers: { "Content-Type": "application/json" } });
+			} catch (e) {
+				return new Response(JSON.stringify({ success: false, error: String(e) }), { status: 400, headers: { "Content-Type": "application/json" } });
+			}
+		}
+
 		return new Response("Not found", { status: 404 });
 	}
 };
