@@ -1,4 +1,8 @@
-# CLAUDE.md
+# nullsafe-plural-v2
+
+Cloudflare Workers MCP server that bridges Claude to a [SimplyPlural](https://apparyllis.com) account via the SimplyPlural REST API. Surfaces fronting state, member lookup, and front history as MCP tools for use by companions and Claude Code.
+
+Part of the BBH suite — see root `CLAUDE.md` for cross-project context.
 
 ## Commands
 
@@ -11,48 +15,24 @@ npm run format       # Format code with oxfmt
 npm run cf-typegen   # Generate Cloudflare Workers types
 ```
 
-Part of the BBH suite -- see root `CLAUDE.md` for cross-project context.
-
-## Multi-Agent System Conventions
-
-When making changes to one identity/config file (e.g., Cypher), always check and apply the same changes to ALL sibling identity files (e.g., Drevan, Gaia, and any others in the same directory).
-
-## Project Scope
-
-When reviewing or fixing bugs across the multi-agent system, always scan ALL projects: Phoenix, Hearth, relay, discord_bot, and any archived directories. Never assume a directory doesn't exist without checking.
-
-## Testing
-
-After implementing any TypeScript changes, run the integration/unit tests before committing. If tests fail, fix all errors (including missing metadata fields, wrong types, empty block formatting) before marking the task complete.
-
-## Ecosystem — Four Interworking Projects
-
-Nullsafe-plural-v2 is one of four projects that form a suite. When making changes that cross boundaries, consult the adjacent project's CLAUDE.md and MCP tools.
-
-| Project | Role |
-|---------|------|
-| **halseth** | Primary data backend — Cloudflare Worker + D1 + R2. Exposes HTTP endpoints and MCP tools (`mcp__claude_ai_Halseth__*`) |
-| **hearth** | Next.js dashboard frontend. Reads halseth HTTP endpoints via `lib/halseth.ts`. Deployed on Vercel |
-| **nullsafe-plural-v2** | Cloudflare Workers MCP for SimplyPlural (plural/fronting system). Exposes `mcp__claude_ai_Nullsafe-Plural-v2__*` tools |
-| **nullsafe-second-brain** | Local Node.js MCP (stdio). Reads halseth + nullsafe-plural-v2 via HTTP, writes to Obsidian vault, maintains SQLite vector store for companion RAG |
-
-Nullsafe-plural-v2 and halseth are independent backends that both surface data upward to hearth and second-brain. Second-brain is the synthesis/RAG layer that reads both.
-
 ## Architecture
 
-This is a **Cloudflare Workers MCP server** that bridges Claude to a SimplyPlural (plural system tracking) account via the SimplyPlural REST API.
+This is a **Cloudflare Workers MCP server** built on `@cloudflare/workers-oauth-provider`.
 
 ### Entry point: `src/index.ts`
 
-The Worker exports a single default fetch handler backed by `OAuthProvider` from `@cloudflare/workers-oauth-provider`. The OAuth layer wraps the MCP agent and handles `/authorize`, `/token`, and `/register` endpoints, while routing `/mcp` to the agent.
+The Worker exports a fetch handler backed by `OAuthProvider`. The OAuth layer wraps the MCP agent and handles `/authorize`, `/token`, and `/register` endpoints, while routing `/mcp` to the agent.
 
-**`NullsafePluralMCP`** extends `McpAgent` (from the `agents` package) and registers these tools:
-- `get_current_front` — fetches live fronters from SimplyPlural
-- `log_front_change` — creates/updates/closes front history entries
-- `get_front_history` — retrieves recent front history
-- `get_member` — resolves a member by any identifier
-- `search_members` — fuzzy name search across the member map
-- `add_member_note` — posts a note to a member's profile
+**`NullsafePluralMCP`** extends `McpAgent` and registers these tools:
+
+| Tool | Description |
+|------|-------------|
+| `get_current_front` | Fetches live fronters from SimplyPlural |
+| `log_front_change` | Creates/updates/closes front history entries |
+| `get_front_history` | Retrieves recent front history |
+| `get_member` | Resolves a member by any identifier |
+| `search_members` | Fuzzy name search across the member map |
+| `add_member_note` | Posts a note to a member's profile |
 
 ### Member resolution (`resolveMemberInput`)
 
@@ -62,28 +42,28 @@ Members are stored in `src/members.json` as a static map of `{ [member_id]: { na
 
 All API calls go through `spRequest()` to `https://api.apparyllis.com/v1`. The auth token is read from the `SIMPLY_PLURAL_TOKEN` environment secret (set via `wrangler secret put SIMPLY_PLURAL_TOKEN`).
 
-### Infrastructure bindings (wrangler.jsonc)
+### Infrastructure bindings (`wrangler.jsonc`)
 
-- **Durable Object**: `NullsafePluralMCP` bound as `MCP_OBJECT` (uses SQLite storage via `new_sqlite_classes` migration)
+- **Durable Object**: `NullsafePluralMCP` bound as `MCP_OBJECT` (SQLite storage via `new_sqlite_classes` migration)
 - **KV**: `OAUTH_KV` for OAuth state storage
 
-### MCP endpoint
+### Connecting
 
-The server is accessible at `/mcp` (SSE transport). Connect via:
-- Claude Desktop: use `mcp-remote` proxy pointing to `https://<your-worker>.workers.dev/mcp`
-- Cloudflare AI Playground: enter the `/mcp` URL directly
+The server is accessible at `/mcp` (SSE transport):
+- **Claude Desktop**: use `mcp-remote` proxy pointing to `https://<your-worker>.workers.dev/mcp`
+- **Cloudflare AI Playground**: enter the `/mcp` URL directly
 
 ## Security
 
-Full OWASP + vibesec audit run 2026-03-09. Fixes applied 2026-03-09. Open findings: `docs/security-audit.md`
+Full OWASP + vibesec audit completed. Open findings: `docs/security-audit.md`
 
-| Severity | Location | Issue |
-|----------|----------|-------|
-| ~~**High**~~ | `src/index.ts` | ✅ **Fixed** — XSS + CSRF + scope inflation all resolved by KV nonce pattern: OAuth params stored server-side on GET under `nonce:<uuid>` (10 min TTL), only the UUID embedded in the form, looked up and deleted on POST. Form no longer reflects any OAuth params into HTML. Security headers added to authorize page. |
-| ~~**Medium**~~ | `src/index.ts` | ✅ **Fixed** — `get_front_history` limit clamped to 1–200 via Zod + Math.min. |
-| ~~**Medium**~~ | `src/index.ts` | ✅ **Fixed** — `SIMPLY_PLURAL_TOKEN` startup check: throws on missing/non-string token. |
-| ~~**Low**~~ | `src/index.ts` | ✅ **Fixed** — `spRequest` error body logged internally, only status code surfaced to callers. |
-| ~~**Low**~~ | `package.json` | ✅ **Fixed** — `npm audit fix` applied; 3 high-severity vulnerabilities in `hono`, `@hono/node-server`, `express-rate-limit` resolved. |
-| **Low** | `src/index.ts:361,372,389` | Open redirect contingent on OAuth library — `redirectUri` flows through `completeAuthorization` to `Response.redirect`. Safe only if `@cloudflare/workers-oauth-provider` validates against registered URIs. Monitor on library updates. |
-| **Low** | Throughout `src/index.ts` | Pervasive `any` types on SimplyPlural API responses — no Zod schema validation. Low priority for a personal tool. |
-| **Low** | No rate limiting | Tool calls have no per-minute limits. A runaway MCP client can exhaust SimplyPlural API quota. |
+| Severity | Location | Status |
+|----------|----------|--------|
+| ~~High~~ | `src/index.ts` | Fixed — XSS + CSRF + scope inflation resolved via KV nonce pattern. OAuth params stored server-side under a UUID (10 min TTL); only the UUID is embedded in the form. |
+| ~~Medium~~ | `src/index.ts` | Fixed — `get_front_history` limit clamped to 1–200 via Zod + Math.min. |
+| ~~Medium~~ | `src/index.ts` | Fixed — `SIMPLY_PLURAL_TOKEN` startup check throws on missing/non-string token. |
+| ~~Low~~ | `src/index.ts` | Fixed — `spRequest` error body logged internally; only status code surfaced to callers. |
+| ~~Low~~ | `package.json` | Fixed — `npm audit fix` applied; high-severity vulnerabilities in dependencies resolved. |
+| Low | `src/index.ts` | Open redirect contingent on OAuth library — `redirectUri` flows through `completeAuthorization`. Safe if `@cloudflare/workers-oauth-provider` validates against registered URIs. Monitor on library updates. |
+| Low | Throughout | Pervasive `any` types on SimplyPlural API responses; no Zod schema validation. Accepted for lean phase. |
+| Low | No rate limiting | Tool calls have no per-minute limits; a runaway client could exhaust SimplyPlural API quota. |
