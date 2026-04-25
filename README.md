@@ -11,6 +11,10 @@ Runs as a Cloudflare Worker on the free tier.
 
 ---
 
+**Not sure where to start?** See [INSTALL.md](./INSTALL.md) for a beginner-friendly step-by-step guide.
+
+---
+
 ## What you need before starting
 
 - A free [Cloudflare account](https://dash.cloudflare.com/sign-up)
@@ -25,7 +29,7 @@ Runs as a Cloudflare Worker on the free tier.
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/your-username/nullsafe-plural-v2
+git clone https://github.com/neurospicyexe/nullsafe-plural-v2
 cd nullsafe-plural-v2
 npm install
 ```
@@ -130,6 +134,6 @@ Restart Claude. The first connection opens a browser to authorize — just click
 
 | Project | What it does |
 |---------|-------------|
-| [Halseth](https://github.com/your-username/halseth) | Companion memory and session backend |
-| [Hearth](https://github.com/your-username/hearth) | Visual dashboard |
-| [nullsafe-second-brain](https://github.com/your-username/nullsafe-second-brain) | Obsidian vault + semantic memory |
+| [Halseth](https://github.com/neurospicyexe/halseth) | Companion memory and session backend |
+| [Hearth](https://github.com/neurospicyexe/hearth) | Visual dashboard |
+| [nullsafe-second-brain](https://github.com/neurospicyexe/nullsafe-second-brain) | Obsidian vault + semantic memory |
