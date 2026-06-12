@@ -363,7 +363,7 @@ export class NullsafePluralMCP extends McpAgent {
 }
 
 const defaultHandler = {
-	async fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
+	async fetch(request: Request, env: any, _ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
 
 		if (url.pathname === "/authorize") {
@@ -529,7 +529,7 @@ const defaultHandler = {
 					.slice(0, limit)
 					.map(([member_id, entry]) => ({ member_id, name: entry.name }));
 				return new Response(JSON.stringify(results), { headers: { "Content-Type": "application/json" } });
-			} catch (e) {
+			} catch {
 				return new Response(JSON.stringify([]), { status: 400, headers: { "Content-Type": "application/json" } });
 			}
 		}
@@ -556,7 +556,7 @@ const defaultHandler = {
 					};
 				});
 				return new Response(JSON.stringify(history), { headers: { "Content-Type": "application/json" } });
-			} catch (e) {
+			} catch {
 				return new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" } });
 			}
 		}
