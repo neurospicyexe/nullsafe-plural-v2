@@ -137,3 +137,13 @@ Restart Claude. The first connection opens a browser to authorize — just click
 | [Halseth](https://github.com/neurospicyexe/halseth) | Companion memory and session backend |
 | [Hearth](https://github.com/neurospicyexe/hearth) | Visual dashboard |
 | [nullsafe-second-brain](https://github.com/neurospicyexe/nullsafe-second-brain) | Obsidian vault + semantic memory |
+
+---
+
+## Acknowledgments
+
+This worker exists because [SimplyPlural](https://apparyllis.com) (by Apparyllis) built a great
+plural-system tracker with an open API. The schema patterns for surfacing fronting state to
+companions were informed by
+[amarisaster/Companion-Continuity-Kit](https://github.com/amarisaster/Companion-Continuity-Kit).
+Fuller credits: [nullsafe-suite acknowledgments](https://github.com/neurospicyexe/nullsafe-suite#acknowledgments). Thank you.
